@@ -22,19 +22,33 @@ Open your Portainer instance in your browser (e.g., `http://<your-server-ip>:900
 2. Click **Add Stack** in the top-right corner.
 3. Give your stack a name (e.g., `my_project_stack`).
 4. Under **Repository**, enter the following details:
-    - **Repository URL**: `https://github.com/yourusername/docker_projects.git`
-    - **Repository Reference**: `main`
+    - **Repository URL**: `https://github.com/bmurrtech/docker_projects.git`
+    - **Repository Reference**: leave blank
     - **Compose Path**: `<project_folder>/docker-compose.yml` (Replace `<project_folder>` with the folder for the project, e.g., `ghost_blog`).
 
 Portainer will now be set to pull the `docker-compose.yml` directly from your GitHub repository for the selected project.
 
+![example_repo_config](https://i.imgur.com/YpSpSIR.png)
+
 ---
 
-## Step 2: Create the `.env` File
+## Step 2: Use the Provided `.env.example` File
 
-For projects that require environment variables (such as API tokens, credentials, or domain names), you need to create a local `.env` file.
+For projects that require environment variables (such as API tokens, credentials, or domain names), you need to create a local `.env` file. If the repository includes a .env.example file, it will often list all the required environment variables with placeholders. You can copy the .env.example to create your .env file, and fill in your own values.
 
-### 2.1 Create the `.env` File on Your Local Machine
+### How to Find the Required Variables if no .env.example File
+- Check the docker-compose.yml File:
+- Open the docker-compose.yml file for the specific project you're deploying.
+- Look for any variables that are wrapped in ${}. These indicate that the value for those variables will be supplied through the .env file.
+- Example:
+
+```yaml
+environment:
+  - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+  - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+```
+
+### 2.1 Create Your Own `.env` File on Your Local Machine or Add the Specific Environment Variables Required 
 
 On your local machine, create a file named `.env` using a text editor (e.g., Notepad, VSCode) and add the relevant content. For example:
 
@@ -44,10 +58,12 @@ MYSQL_PASSWORD=your-db-password
 MYSQL_ROOT_PASSWORD=your-root-password
 DOMAIN_NAME=yourdomain.com
 ```
-Add the specific environment variables required by the project you are deploying.
+
 ---
 
 ### Entering Environment Variables Manually (Optional)
+
+![example_variables_add](https://i.imgur.com/V40hQE2.png)
 
 If you don’t want to store the `.env` file on your local machine, you can manually enter the environment variables in Portainer.
 
@@ -67,7 +83,7 @@ If you don’t want to store the `.env` file on your local machine, you can manu
    | `DB_PASSWORD`        | your-db-password     |
    | `DOMAIN_NAME`        | yourdomain.com       |
 
-5. **Deploy the stack** once all environment variables have been added correctly.
+6. **Deploy the stack** once all environment variables have been added correctly.
 
 ---
 
