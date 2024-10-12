@@ -1,0 +1,19 @@
+# Ignore docker specific files
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+
+# Ignore Docker volumes
+**/mysql_data
+**/ghost_content
+
+# Ignore sensitive configuration
+.env
+
+# Ignore logs, temp files, and build artifacts
+*.log
+*.pid
+*.lock
+*.swp
+*.tmp
+*.bak
