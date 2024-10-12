@@ -6,6 +6,7 @@
 
 # Ignore the traefik.yml file in the traefik/config directory
 traefik/config/traefik.yml
+traefik/certs/acme.json
 
 # Ignore Let's Encrypt certificates and ACME storage
 letsencrypt/
