@@ -173,3 +173,58 @@ volumes:
 ---
 
 With this guide, you can deploy your Ghost blog using Portainer, and it will automatically pull the necessary files from the GitHub repository.
+
+
+## Troubleshooting: Manually Cloning and Uploading `docker-compose.yml`
+
+If you encounter an error when trying to pull the repository through Portainer, you can manually clone the repository to your local machine and upload the `docker-compose.yml` file to Portainer using the **upload** option.
+
+### Steps to Manually Clone and Upload:
+
+1. **Open a terminal** on your local machine.
+
+2. **Run the following command** to manually clone the repository:
+   ```bash
+   git clone https://github.com/bmurrtech/docker_projects.git
+   ```
+
+3. **Navigate to the `ghost_blog` folder** where the `docker-compose.yml` is located:
+   ```bash
+   cd docker_projects/ghost_blog
+   ```
+
+4. **Log in to Portainer**.
+
+5. **Create a new stack** in Portainer:
+   - Go to the **Stacks** section and click **Add stack**.
+   - **Upload the `docker-compose.yml` file** from the `ghost_blog` folder on your local machine by clicking **Upload**.
+
+6. **Deploy the stack** as usual by clicking **Deploy the stack**.
+
+---
+
+### Entering Environment Variables Manually (Optional)
+
+If you don’t want to store the `.env` file on your local machine, you can manually enter the environment variables in Portainer.
+
+1. **Scroll down to the Environment Variables section** in the Portainer stack creation screen.
+
+2. **Click on the "Add an environment variable" button**.
+
+3. **Map the environment variables correctly**. You need to enter the following variables:
+   - **MYSQL_PASSWORD**: The password for the `ghost` MySQL user.
+   - **MYSQL_ROOT_PASSWORD**: The root password for MySQL.
+   - **DOMAIN_NAME**: Your Ghost blog's domain name.
+
+4. **Example values** you should enter:
+   | Variable             | Value                |
+   |----------------------|----------------------|
+   | `MYSQL_PASSWORD`      | your-ghost-db-password |
+   | `MYSQL_ROOT_PASSWORD` | your-root-password   |
+   | `DOMAIN_NAME`         | yourdomain.com       |
+
+5. **Deploy the stack** once all environment variables have been added correctly.
+
+---
+
+By following these steps, you can bypass the repository pull issue and still deploy the Ghost blog stack successfully.
