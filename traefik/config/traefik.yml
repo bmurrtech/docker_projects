@@ -32,7 +32,7 @@ certificatesResolvers:
           - "1.1.1.1:53"
           - "8.8.8.8:53"
 
-# Optional: Overwrite Default Certificates
+# Optional: Overwrite Default Certificates; if you're using custom or self-signed certificates, you should uncomment and configure the tls section.
 # tls:
 #   stores:
 #     default:
