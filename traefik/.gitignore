@@ -4,6 +4,9 @@
 # Ignore any log files (optional, if you use logs)
 *.log
 
+# Ignore the traefik.yml file in the traefik/config directory
+traefik/config/traefik.yml
+
 # Ignore Let's Encrypt certificates and ACME storage
 letsencrypt/
 acme.json
