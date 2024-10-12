@@ -1,0 +1,27 @@
+# Ignore the actual .env file containing sensitive information
+.env
+
+# Ignore any log files (optional, if you use logs)
+*.log
+
+# Ignore Let's Encrypt certificates and ACME storage
+letsencrypt/
+acme.json
+
+# Ignore any temporary or backup files
+*.bak
+*.tmp
+*.swp
+
+# Ignore Docker-related files
+docker-compose.override.yml
+.docker
+
+# Ignore node_modules and package lock files (if you use Node.js for some reason)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Ignore system-specific files
+.DS_Store
+Thumbs.db
