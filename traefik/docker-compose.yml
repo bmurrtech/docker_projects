@@ -7,15 +7,15 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      # -- (Optional) Enable Dashboard, don't do in production
-      # - "8081:${DASHBOARD_PORT}"
+      # Optional: Enable Dashboard for testing (on port 8080)
+      - "8080:${DASHBOARD_PORT}"  # Set in .env if needed
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "${HOST_TRAEFIK_CONFIG}/traefik.yml:/etc/traefik/traefik.yml:ro"
       - "${HOST_TRAEFIK_CONFIG}/conf/:/etc/traefik/conf/"
       - "${HOST_TRAEFIK_CERTS}/certs/:/etc/traefik/certs/"
     environment:
-      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}  # Cloudflare API token from .env
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}  # Your Cloudflare API token from .env
     networks:
       - frontend
     restart: unless-stopped
