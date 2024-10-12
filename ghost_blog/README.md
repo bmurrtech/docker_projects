@@ -40,14 +40,14 @@ You need to create a local `.env` file to provide environment variables that con
 
 On your local machine, create a file named `.env` using a text editor (e.g., Notepad, VSCode) and add the following content:
 
-\`\`\`bash
+```bash
 # MySQL Database Credentials
 MYSQL_PASSWORD=your-ghost-db-password
 MYSQL_ROOT_PASSWORD=your-root-password
 
 # Domain Name for Ghost Blog
 DOMAIN_NAME=yourdomain.com
-\`\`\`
+```
 
 - **MYSQL_PASSWORD**: Set this to the password for the MySQL `ghost` user.
 - **MYSQL_ROOT_PASSWORD**: Set this to the root password for MySQL.
@@ -96,11 +96,11 @@ Once the stack has been deployed:
 
 Here’s an example of what your `.env` file should look like:
 
-\`\`\`bash
+```bash
 MYSQL_PASSWORD=ghostpassword123
 MYSQL_ROOT_PASSWORD=rootpassword123
 DOMAIN_NAME=blog.example.com
-\`\`\`
+```
 
 Make sure to replace the placeholder values with your actual credentials and domain name.
 
@@ -110,7 +110,7 @@ Make sure to replace the placeholder values with your actual credentials and dom
 
 The following is the `docker-compose.yml` file provided in this repository:
 
-\`\`\`yaml
+```yaml
 version: "3.8"
 
 services:
@@ -168,7 +168,7 @@ networks:
 volumes:
   ghost_content:
   mysql_data:
-\`\`\`
+```
 
 ---
 
