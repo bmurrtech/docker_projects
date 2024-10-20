@@ -42,20 +42,22 @@ certificatesResolvers:
       caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
       dnsChallenge:
         provider: cloudflare
+        delayBeforeCheck: 0  # Optional: Reduce waiting time for propagation check
         resolvers:
           - "1.1.1.1:53"
           - "8.8.8.8:53"
-      httpChallenge:
-        entryPoint: web
+#      httpChallenge: # Leave commented out if you are using a Cloudflare API token for the DNS challenge
+#        entryPoint: web # Same as above
 #  production:
 #    acme:
 #      email: "your-email@example.com"  # Set your email here
 #      storage: "/etc/traefik/certs/cloudflare-acme-production.json"
 #      caServer: "https://acme-v02.api.letsencrypt.org/directory"
-#      httpChallenge:
-#        entryPoint: web
+#      httpChallenge: # Leave commented out if you are using a Cloudflare API token for the DNS challenge
+#        entryPoint: web # Same as above
 #      dnsChallenge:
 #        provider: cloudflare
+#        delayBeforeCheck: 0  # Optional: Reduce waiting time for propagation check
 #        resolvers:
 #          - "1.1.1.1:53"
 #          - "8.8.8.8:53"
