@@ -1,4 +1,7 @@
 services:
+volume: # For persistent storage of SSL certs and preventing rate limits
+  traefik-ssl-certs:
+    driver: local
   traefik:
     image: traefik:latest
     container_name: traefik_v3
