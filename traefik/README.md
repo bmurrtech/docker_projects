@@ -18,19 +18,18 @@
 
 ## Download Required Files for Traefik Setup
 
-To set up Traefik, you'll need two files:
+To set up Traefik, you must manually download this file:
 
 - `traefik.yml` for configuring Traefik
-- `acme.json` for SSL certificate storage
 
-You can download these files directly to the correct folder paths using `wget`.
+You can download these files directly to the your ideal folder path using `wget`.
 
 ### Step 1: Create the Necessary Directories
 
 First, ensure the correct directory structure is created for storing these files:
 
 ```bash
-mkdir -p traefik/certs
+mkdir -p traefik/config
 ```
 
 ### Step 2: Download the `traefik.yml` File
@@ -41,31 +40,7 @@ Use the following `wget` command to download the `traefik.yml` file:
 wget https://raw.githubusercontent.com/bmurrtech/docker_projects/main/traefik/config/traefik.yml -P /path/to/your/desired/folder
 ```
 
-Replace `/path/to/your/desired/folder` with the actual directory path where you want to save the `traefik.yml` file.
-
-### Step 3: Download the `acme.json` File
-
-Next, download the `acme.json` file using `wget` and save it in the `traefik/certs` folder you created earlier:
-
-```bash
-wget https://raw.githubusercontent.com/bmurrtech/docker_projects/main/traefik/certs/acme.json -P /path/to/your/desired/folder/traefik/certs
-```
-
-### Step 4: Set Correct Permissions for `acme.json`
-
-After downloading `acme.json`, ensure it has the correct permissions. Traefik requires this file to be writable by its container:
-
-```bash
-chmod 600 /path/to/your/desired/folder/traefik/certs/acme.json
-```
-
-### Step 5: Run Traefik Using Docker Compose
-
-Once both files are downloaded and placed in the correct directories, you can start Traefik by navigating to the directory containing `docker-compose.yml` and running the following command:
-
-```bash
-docker-compose up -d
-```
+Replace `/path/to/your/desired/folder/traefik/config` with the actual directory path where you want to save the `traefik.yml` file.
 
 This will start Traefik and enable SSL certificate management via Let's Encrypt.
 
