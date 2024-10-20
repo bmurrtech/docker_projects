@@ -25,7 +25,7 @@ services:
       - internal
     depends_on:
       db:
-        condition: service_healty
+        condition: service_healthy
 # Uncomment the following line for local testing; remove in production where Traefik handles routing.
     # ports:
     #   - "8080:2368"
