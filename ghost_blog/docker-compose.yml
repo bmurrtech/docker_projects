@@ -12,7 +12,7 @@ services:
     volumes:
       - ./ghost_content:/var/lib/ghost/content
     ports:
-      - ${GHOST_PORTS:-}  # For staging purposes; only expose port if GHOST_PORTS is set via environment variable
+      - ${GHOST_PORTS:-}  # For staging purposes; in production, set as 80:80 which should be handled by a reverse proxy such as Traefik
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ghost.rule=Host(`${DOMAIN_NAME}`)"
