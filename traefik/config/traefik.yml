@@ -3,6 +3,12 @@ global:
   checkNewVersion: true
   sendAnonymousUsage: false
 
+# Log settings
+log:
+  level: ERROR  # Options: ERROR, WARN, INFO, DEBUG
+  filePath: "/var/log/traefik/traefik.log"  # Optional: Specify a log file path if needed
+  format: common  # Optional: Use 'json' for JSON logs or 'common' for human-readable logs
+
 # EntryPoints for HTTP and HTTPS
 entryPoints:
   web:
