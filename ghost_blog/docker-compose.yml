@@ -12,13 +12,13 @@ services:
     volumes:
       - ./ghost_content:/var/lib/ghost/content
     ports:
-      - ${GHOST_PORTS:-}  # For staging purposes; in production, set as 80:80 which should be handled by a reverse proxy such as Traefik
+      - ${GHOST_PORTS:-}  # For staging purposes; in production with a reverse proxy, set as 9999:2368
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ghost.rule=Host(`${DOMAIN_NAME}`)"
       - "traefik.http.routers.ghost.entrypoints=web"  # Use HTTP entrypoint
       - "traefik.http.routers.ghost.tls=true"
-      - "traefik.http.routers.ghost.tls.certresolver=production"
+      - "traefik.http.routers.ghost.tls.certresolver=${CERTRESOLVER}"  # Use variable to select between "staging" and "production"
       - "traefik.http.services.ghost.loadbalancer.server.port=2368"
       - "traefik.http.services.ghost.loadbalancer.healthcheck.path=/"
       - "traefik.http.services.ghost.loadbalancer.healthcheck.interval=30s"
