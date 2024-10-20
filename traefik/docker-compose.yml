@@ -17,8 +17,6 @@ services:
       - ACME_EMAIL=${ACME_EMAIL}
     networks:
       - frontend
-    depends_on:
-      - setup  # Ensure Traefik only starts after setup completes
     restart: unless-stopped  # Traefik will restart normally on failures
 
 networks:
