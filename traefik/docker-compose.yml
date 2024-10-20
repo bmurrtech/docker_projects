@@ -9,11 +9,12 @@ services:
       # - "${DASHBOARD_PORT}:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "${HOST_TRAEFIK_CONFIG}/traefik.yml:/etc/traefik/traefik.yml:ro"  # Mount traefik.yml
-      - "${HOST_TRAEFIK_CONFIG}/conf/:/etc/traefik/conf/:ro"  # Config folder (if exists)
-      - "${HOST_TRAEFIK_CERTS}/certs/:/etc/traefik/certs/:rw"  # Certs folder for SSL
+      - "./config/traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "./config/conf:/etc/traefik/conf:ro"
+      - "./config/certs:/etc/traefik/certs:rw"
     environment:
-      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}  # Cloudflare API token from .env
+      - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
+      - ACME_EMAIL=${ACME_EMAIL}
     networks:
       - frontend
     restart: unless-stopped
