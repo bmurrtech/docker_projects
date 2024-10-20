@@ -2,6 +2,21 @@
 
 # Traefik Setup Guide
 
+```
+/home/btm/traefik/
+│
+├── docker-compose.yml         # Docker Compose configuration
+├── .env                       # Environment variables (personalized info, not tracked)
+├── config/                    # Traefik configuration directory
+│   ├── traefik.yml            # Traefik main config (uses variables, tracked by Git)
+│   ├── conf/                  # Additional Traefik configs (dynamic)
+│   │   └── .gitkeep           # Placeholder to keep the folder in Git
+│   ├── certs/                 # Store certificates
+│   │   └── .gitkeep           # Placeholder to keep the folder in Git
+│   └── .gitignore             # Git ignore rules for sensitive files
+
+```
+
 ## Download Required Files for Traefik Setup
 
 To set up Traefik, you'll need two files:
