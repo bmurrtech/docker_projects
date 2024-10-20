@@ -1,21 +1,30 @@
-# Global settings
 global:
   checkNewVersion: true
   sendAnonymousUsage: false
 
-# -- (Optional) Change log level and format here ...
-#     - level: [TRACE, DEBUG, INFO, WARN, ERROR, FATAL]
-#     - format: [common, json]
-# log:
-#  level: ERROR
-#  format: common
-#  filePath: /var/log/traefik/traefik.log
+# -- Configure logging settings --
+log:
+  level: ERROR
+  format: common
+  # Optional: Uncomment to write logs to a specific file
+  # filePath: /var/log/traefik/traefik.log
 
-# EntryPoints for HTTP and HTTPS
+# -- Optional: Enable access log --
+accesslog:
+  format: common
+  # Optional: Uncomment to write access logs to a specific file
+  # filePath: /var/log/traefik/access.log
+
+# -- Optional: Enable API and Dashboard for testing, disable in production --
+# api:
+#  dashboard: true
+#  insecure: true  # Set to "false" in production
+
+# -- Configure EntryPoints for HTTP and HTTPS --
 entryPoints:
   web:
     address: ":80"
-    # Redirect HTTP to HTTPS
+    # Optional: Redirect all HTTP to HTTPS
     http:
       redirections:
         entryPoint:
@@ -23,40 +32,45 @@ entryPoints:
           scheme: https
   websecure:
     address: ":443"
-    # Optional: You can define custom TLS configurations here, if needed
-    # tls:
-    #   certResolver: cloudflare
 
-# Certificate Resolvers for Let's Encrypt using Cloudflare DNS Challenge
+# -- Configure CertificateResolvers for Let's Encrypt Staging and Production --
 certificatesResolvers:
-  production:
+  staging:
     acme:
-      email: "${ACME_EMAIL}"  # Your email from .env file for Let's Encrypt registration
-      storage: "/etc/traefik/certs/acme.json"
-      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+      email: "your-email@example.com"  # Set your email here
+      storage: "/etc/traefik/certs/cloudflare-acme-staging.json"
+      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
       dnsChallenge:
         provider: cloudflare
         resolvers:
           - "1.1.1.1:53"
           - "8.8.8.8:53"
+      httpChallenge:
+        entryPoint: web
+#  production:
+#    acme:
+#      email: "your-email@example.com"  # Set your email here
+#      storage: "/etc/traefik/certs/cloudflare-acme-production.json"
+#      caServer: "https://acme-v02.api.letsencrypt.org/directory"
+#      httpChallenge:
+#        entryPoint: web
+#      dnsChallenge:
+#        provider: cloudflare
+#        resolvers:
+#          - "1.1.1.1:53"
+#          - "8.8.8.8:53"
 
-# Optional: Overwrite Default Certificates; if you're using custom or self-signed certificates, you should uncomment and configure the tls section.
+# -- Optional: Overwrite Default Certificates --
 # tls:
-#   stores:
-#     default:
-#       defaultCertificate:
-#         certFile: /etc/traefik/certs/cert.pem
-#         keyFile: /etc/traefik/certs/cert-key.pem
+# stores:
+#    default:
+#      defaultCertificate:
+#        certFile: /etc/traefik/certs/cert.pem
+#        keyFile: /etc/traefik/certs/cert-key.pem
 
-# Providers for Docker and File
 providers:
   docker:
     exposedByDefault: false  # Ensure containers must be explicitly exposed
   file:
     directory: "/etc/traefik/conf"
     watch: true
-
-# (Optional) Enable the API and Dashboard (Insecure set to true is for testing; disable in production)
-api:
-  dashboard: true
-  insecure: false  # Change to true for testing and keep as false for production
