@@ -9,9 +9,9 @@ services:
       # - "${DASHBOARD_PORT}:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "./config/traefik.yml:/etc/traefik/traefik.yml:ro"
-      - "./config/conf:/etc/traefik/conf:ro"
-      - "./config/certs:/etc/traefik/certs:rw"
+      - "${TRAEFIK_CONFIG}/traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "${TRAEFIK_CONFIG}/conf:/etc/traefik/conf:ro"
+      - "${TRAEFIK_CONFIG_PATH}/certs:/etc/traefik/certs:rw"
     environment:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
       - ACME_EMAIL=${ACME_EMAIL}
