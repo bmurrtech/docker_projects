@@ -13,8 +13,6 @@
 │   │   └── .gitkeep           # Placeholder to keep the folder in Git
 │   ├── certs/                 # Store certificates
 │   │   └── .gitkeep           # Placeholder to keep the folder in Git
-│   └── .gitignore             # Git ignore rules for sensitive files
-
 ```
 
 ## Download Required Files for Traefik Setup
