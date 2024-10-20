@@ -1,11 +1,4 @@
 services:
-  setup:
-    image: alpine:latest
-    volumes:
-      - "${TRAEFIK_CONFIG_PATH}:/config"
-    command: ["/bin/sh", "-c", "/config/startup.sh"]
-    restart: "no"  # Ensure the setup service doesn't restart on failure or reboot
-
   traefik:
     image: traefik:latest
     container_name: traefik_v3
