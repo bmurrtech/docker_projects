@@ -4,6 +4,9 @@
 # Ignore any log files (optional, if you use logs)
 *.log
 
+# Ignore the traefik.yml file becaues it causes an error every time
+config/traefik.yml
+
 # Ignore any temporary or backup files
 *.bak
 *.tmp
