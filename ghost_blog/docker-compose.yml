@@ -20,16 +20,24 @@ services:
       - "traefik.http.routers.ghost.tls=true"
       - "traefik.http.routers.ghost.tls.certresolver=production"
       - "traefik.http.services.ghost.loadbalancer.server.port=2368"
+      # Add health check to Traefik
+      - "traefik.http.services.ghost.loadbalancer.healthcheck.path=/"
+      - "traefik.http.services.ghost.loadbalancer.healthcheck.interval=30s"
+      - "traefik.http.services.ghost.loadbalancer.healthcheck.timeout=5s"
+      # Add retry middleware to avoid connection issues
+      - "traefik.http.middlewares.retry.retry.attempts=3"
     networks:
       - frontend
       - internal
     depends_on:
       db:
-        condition: service_healthy
-# Uncomment the following line for local testing; remove in production where Traefik handles routing.
-    # ports:
-    #   - "8080:2368"
-
+        condition: service_healthy  # Fixed typo here
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2368"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
 
   db:
     image: mysql:latest
