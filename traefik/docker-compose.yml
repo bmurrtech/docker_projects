@@ -1,17 +1,17 @@
 services:
   traefik:
     image: traefik:latest
-    container_name: traefik_v2
+    container_name: traefik_v3
     ports:
       - "80:80"
       - "443:443"
       # Optional: Enable Dashboard for testing (maps 8082 on host to 8080 inside container)
-      - "${DASHBOARD_PORT}:8080"
+      # - "${DASHBOARD_PORT}:8080"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "${HOST_TRAEFIK_CONFIG}/traefik.yml:/etc/traefik/traefik.yml:ro"  # Mount traefik.yml
-      - "${HOST_TRAEFIK_CONFIG}/conf/:/etc/traefik/conf/"  # Config folder (if exists)
-      - "${HOST_TRAEFIK_CERTS}/certs/:/etc/traefik/certs/"  # Certs folder for SSL
+      - "${HOST_TRAEFIK_CONFIG}/conf/:/etc/traefik/conf/:ro"  # Config folder (if exists)
+      - "${HOST_TRAEFIK_CERTS}/certs/:/etc/traefik/certs/:rw"  # Certs folder for SSL
     environment:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}  # Cloudflare API token from .env
     networks:
