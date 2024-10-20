@@ -10,13 +10,13 @@ services:
       - database__connection__database=ghostdb
       - url=${GHOST_URL}  # URL is set via environment variable (local or production)
     volumes:
-      - ./ghost_content:/var/lib/ghost/content
+      - ${GHOST_PATH:-./ghost_content}:/var/lib/ghost/content  # Use GHOST_PATH environment variable for content path
     ports:
       - ${GHOST_PORTS:-}  # For staging purposes; in production with a reverse proxy, set as 9999:2368
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.ghost.rule=Host(`${DOMAIN_NAME}`)"
-      - "traefik.http.routers.ghost.entrypoints=web"  # Use HTTP entrypoint
+      - "traefik.http.routers.ghost.entrypoints=web, websecure"
       - "traefik.http.routers.ghost.tls=true"
       - "traefik.http.routers.ghost.tls.certresolver=${CERTRESOLVER}"  # Use variable to select between "staging" and "production"
       - "traefik.http.services.ghost.loadbalancer.server.port=2368"
