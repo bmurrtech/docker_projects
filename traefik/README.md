@@ -6,7 +6,8 @@
 /home/btm/traefik/
 │
 ├── docker-compose.yml         # Docker Compose configuration
-├── .env                       # Environment variables (personalized info, not tracked)
+├── .env.example                       # Environment variables (personalized info, not tracked)
+├── startup.sh                 # Initialization and stack launch script
 ├── config/                    # Traefik configuration directory
 │   ├── traefik.yml            # Traefik main config (uses variables, tracked by Git)
 │   ├── conf/                  # Additional Traefik configs (dynamic)
