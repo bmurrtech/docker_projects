@@ -1,9 +1,6 @@
 # Ignore the actual .env file containing sensitive information
 .env
 
-# Ignore the traefik.yml file becaues it causes an error every time
-config/traefik.yml
-
 # Ignore any log files (optional, if you use logs)
 *.log
 
