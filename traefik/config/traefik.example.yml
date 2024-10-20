@@ -1,6 +1,6 @@
 # Global settings
 global:
-  checkNewVersion: false
+  checkNewVersion: true
   sendAnonymousUsage: false
 
 # EntryPoints for HTTP and HTTPS
