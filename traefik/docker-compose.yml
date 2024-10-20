@@ -1,23 +1,32 @@
 services:
+  setup:
+    image: alpine:latest
+    volumes:
+      - "${TRAEFIK_CONFIG_PATH}:/config"
+    command: ["/bin/sh", "-c", "/config/startup.sh"]
+    restart: "no"  # Ensure the setup service doesn't restart on failure or reboot
+
   traefik:
     image: traefik:latest
-    container_name: traefik_v3
+    container_name: traefik_v2
     ports:
       - "80:80"
       - "443:443"
       # Optional: Enable Dashboard for testing (maps 8082 on host to 8080 inside container)
       # - "${DASHBOARD_PORT}:8080"
     volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-      - "${TRAEFIK_CONFIG}/traefik.yml:/etc/traefik/traefik.yml:ro"
-      - "${TRAEFIK_CONFIG}/conf:/etc/traefik/conf:ro"
+      - "${TRAEFIK_CONFIG_PATH}/traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "${TRAEFIK_CONFIG_PATH}/conf:/etc/traefik/conf:ro"
       - "${TRAEFIK_CONFIG_PATH}/certs:/etc/traefik/certs:rw"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
     environment:
       - CF_DNS_API_TOKEN=${CF_DNS_API_TOKEN}
       - ACME_EMAIL=${ACME_EMAIL}
     networks:
       - frontend
-    restart: unless-stopped
+    depends_on:
+      - setup  # Ensure Traefik only starts after setup completes
+    restart: unless-stopped  # Traefik will restart normally on failures
 
 networks:
   frontend:
