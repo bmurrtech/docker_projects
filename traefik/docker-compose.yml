@@ -1,7 +1,4 @@
 services:
-volume: # For persistent storage of SSL certs and preventing rate limits
-  traefik-ssl-certs:
-    driver: local
   traefik:
     image: traefik:latest
     container_name: traefik
@@ -21,6 +18,10 @@ volume: # For persistent storage of SSL certs and preventing rate limits
     networks:
       - frontend
     restart: unless-stopped  # Traefik will restart normally on failures
+
+volumes:  # For persistent storage of SSL certs and preventing rate limits
+  traefik-ssl-certs:
+    driver: local
 
 networks:
   frontend:
