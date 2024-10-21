@@ -11,24 +11,21 @@ services:
       - url=${GHOST_URL}  # URL is set via environment variable (local or production)
     volumes:
       - ${GHOST_PATH:-./ghost_content}:/var/lib/ghost/content  # Use GHOST_PATH environment variable for content path
-    ports:
-      - ${GHOST_PORTS:-}  # For staging purposes; in production with a reverse proxy, set as 9999:2368
+#    ports:
+#      - ${GHOST_PORTS:-}  # For staging purposes; in production with a reverse proxy, you can remove the ports directive altogether
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.ghost.rule=Host(`${DOMAIN_NAME}`)"
-      - "traefik.http.routers.ghost.entrypoints=web, websecure"
+      - "traefik.http.routers.ghost.rule=Host(${DOMAIN_NAME})"
+      - "traefik.http.routers.ghost.entrypoints=web,websecure"
       - "traefik.http.routers.ghost.tls=true"
       - "traefik.http.routers.ghost.tls.certresolver=${CERTRESOLVER}"  # Use variable to select between "staging" and "production"
       - "traefik.http.services.ghost.loadbalancer.server.port=2368"
-      - "traefik.http.services.ghost.loadbalancer.healthcheck.path=/"
-      - "traefik.http.services.ghost.loadbalancer.healthcheck.interval=30s"
-      - "traefik.http.middlewares.retry.retry.attempts=3"
     networks:
       - frontend
       - internal
     depends_on:
       db:
-        condition: service_healthy
+        condition: service_healthy  # Ghost service depends on MySQL (db) service being healthy before starting. This ensures Ghost won't attempt to connect to the database before it is ready, preventing connection errors.
 
   db:
     image: mysql:latest
@@ -43,11 +40,11 @@ services:
     networks:
       - internal
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]  # Health check to verify MySQL is up and responding to commands
+      interval: 10s  # Time between each health check
+      timeout: 5s  # Time to wait for a response before considering the health check failed
+      retries: 5  # Number of retries before marking the container as unhealthy
+      start_period: 10s  # Time to wait before starting health checks after the container starts
 
 networks:
   frontend:
