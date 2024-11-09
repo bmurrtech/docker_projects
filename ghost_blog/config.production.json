@@ -1,0 +1,15 @@
+// config.production.json
+
+"mail": {
+  "transport": "SMTP",
+  "options": {
+    "service": "Mailgun",
+    "host": "smtp.mailgun.org",
+    "port": 465,
+    "secure": true,
+    "auth": {
+      "user": "postmaster@example.mailgun.org",
+      "pass": "[insert_your_mailgun_pw]"
+    }
+  }
+},
