@@ -29,8 +29,8 @@ prompt_input MYSQL_ROOT_PASSWORD "Enter your MySQL root password (used for Ghost
 echo "Summary of configuration:"
 echo "Email: $EMAIL"
 echo "Domain: $DOMAIN"
-echo "Cloudflare API Token: $CF_API_TOKEN"
-echo "MySQL Root Password: $MYSQL_ROOT_PASSWORD"
+echo "Cloudflare API Token: (hidden for security)"
+echo "MySQL Root Password: (hidden for security)"
 echo "Is this configuration correct? (y/n)"
 read -n 1 final_confirm
 echo
@@ -161,12 +161,8 @@ echo "Setting permissions for Traefik..."
 sudo touch /etc/traefik/certs/cloudflare-acme-staging.json
 sudo chmod 600 /etc/traefik/certs/cloudflare-acme-staging.json
 
-# Cloudflare API token configuration for Traefik
-sudo bash -c "echo 'CF_DNS_API_TOKEN=$CF_API_TOKEN' > /etc/traefik/cloudflare.env"
-sudo chmod 600 /etc/traefik/cloudflare.env
-
-# Create systemd service for Traefik
-echo "Creating Traefik systemd service..."
+# Configure Traefik with Cloudflare API token as an environment variable
+echo "Creating systemd service for Traefik with secure API token..."
 sudo bash -c "cat << EOF > /etc/systemd/system/traefik.service
 [Unit]
 Description=Traefik
@@ -174,13 +170,16 @@ After=network.target
 
 [Service]
 Type=simple
+Environment=CF_DNS_API_TOKEN=$CF_API_TOKEN
 ExecStart=/usr/local/bin/traefik --configFile=/etc/traefik/traefik.yml
-EnvironmentFile=/etc/traefik/cloudflare.env
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 EOF"
+
+# Secure systemd service file permissions
+sudo chmod 600 /etc/systemd/system/traefik.service
 
 # Start and enable Traefik
 echo "Starting Traefik..."
