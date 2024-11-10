@@ -20,10 +20,10 @@ function prompt_input {
 }
 
 # Prompt user for variables
-prompt_input EMAIL "Enter your email"
-prompt_input DOMAIN "Enter your domain"
+prompt_input EMAIL "Enter your email for Let's Encrypt notifications"
+prompt_input DOMAIN "Enter your domain for the Ghost site"
 prompt_input CF_API_TOKEN "Enter your Cloudflare API token"
-prompt_input MYSQL_ROOT_PASSWORD "Enter your MySQL root password (used for Ghost)"
+prompt_input MYSQL_ROOT_PASSWORD "Enter a secure MySQL root password for Ghost"
 
 # Confirm installation settings
 echo "Summary of configuration:"
@@ -43,21 +43,24 @@ fi
 echo "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 
-# Install MySQL 8
-echo "Installing MySQL 8..."
+# Install MySQL 8 with restrictive access
+echo "Installing MySQL 8 and configuring for secure local-only access..."
 wget https://dev.mysql.com/get/mysql-apt-config_0.8.22-1_all.deb
 sudo dpkg -i mysql-apt-config_0.8.22-1_all.deb
 sudo apt update
 sudo apt install -y mysql-server
 rm mysql-apt-config_0.8.22-1_all.deb
 
-# Configure MySQL root password
-echo "Configuring MySQL root user for password authentication..."
+# Configure MySQL root password and restrict MySQL access to localhost only
+echo "Configuring MySQL for password authentication and localhost-only access..."
 sudo mysql <<EOF
 ALTER USER 'root'@'localhost' IDENTIFIED WITH 'mysql_native_password' BY '$MYSQL_ROOT_PASSWORD';
 FLUSH PRIVILEGES;
-EXIT
 EOF
+
+# Modify MySQL configuration for localhost-only access
+sudo sed -i 's/^bind-address\s*=.*/bind-address = 127.0.0.1/' /etc/mysql/mysql.conf.d/mysqld.cnf
+sudo systemctl restart mysql
 
 # Install Node.js (Node 18) for Ghost
 echo "Setting up Node.js 18..."
@@ -79,7 +82,7 @@ sudo chown $USER:$USER /var/www/ghost
 # Navigate to the Ghost directory
 cd /var/www/ghost
 
-# Install Ghost
+# Install Ghost with HTTPS using Traefik as reverse proxy
 echo "Installing Ghost..."
 ghost install --no-prompt --db=mysql --url="https://$DOMAIN" --dbhost=localhost --dbuser=root --dbpass="$MYSQL_ROOT_PASSWORD" --dbname=ghost_prod --process=systemd --no-setup-nginx --no-setup-ssl
 
@@ -91,10 +94,10 @@ sudo mv traefik /usr/local/bin/
 rm traefik_v2.10.1_linux_amd64.tar.gz
 
 # Create Traefik configuration files
-echo "Configuring Traefik..."
+echo "Configuring Traefik for HTTPS with Cloudflare DNS challenge..."
 sudo mkdir -p /etc/traefik /etc/traefik/conf /etc/traefik/certs
 
-# Traefik main config
+# Main Traefik configuration with HTTPS and Let's Encrypt staging
 sudo bash -c "cat << EOF > /etc/traefik/traefik.yml
 global:
   checkNewVersion: true
@@ -137,7 +140,7 @@ providers:
     watch: true
 EOF"
 
-# Dynamic configuration for Ghost
+# Dynamic Traefik configuration for Ghost
 sudo bash -c "cat << EOF > /etc/traefik/conf/dynamic.yml
 http:
   routers:
@@ -156,13 +159,12 @@ http:
           - url: 'http://127.0.0.1:2368'
 EOF"
 
-# Set permissions for ACME storage
-echo "Setting permissions for Traefik..."
-sudo touch /etc/traefik/certs/cloudflare-acme-staging.json
-sudo chmod 600 /etc/traefik/certs/cloudflare-acme-staging.json
+# Set restrictive permissions on sensitive files
+echo "Setting restrictive permissions on Traefik configuration files..."
+sudo chmod 600 /etc/traefik/traefik.yml /etc/traefik/certs/cloudflare-acme-staging.json
 
-# Configure Traefik with Cloudflare API token as an environment variable
-echo "Creating systemd service for Traefik with secure API token..."
+# Cloudflare API token set as an environment variable in Traefik service
+echo "Creating secure systemd service for Traefik with Cloudflare token..."
 sudo bash -c "cat << EOF > /etc/systemd/system/traefik.service
 [Unit]
 Description=Traefik
@@ -178,7 +180,7 @@ Restart=on-failure
 WantedBy=multi-user.target
 EOF"
 
-# Secure systemd service file permissions
+# Secure permissions for the Traefik service file
 sudo chmod 600 /etc/systemd/system/traefik.service
 
 # Start and enable Traefik
@@ -192,16 +194,11 @@ echo "Creating production promotion script..."
 sudo bash -c "cat << EOF > /usr/local/bin/promote_to_production.sh
 #!/bin/bash
 
-# Update Traefik to use production Let's Encrypt server and remove staging certs
 echo 'Switching to production certificate resolver...'
 sudo sed -i 's/certResolver: staging/certResolver: production/' /etc/traefik/conf/dynamic.yml
-
-# Update main Traefik config to use production resolver
 sudo sed -i 's/certificatesResolvers.staging/certificatesResolvers.production/' /etc/traefik/traefik.yml
 
-# Add production resolver to Traefik main config
 sudo bash -c \"cat << PROD >> /etc/traefik/traefik.yml
-
   production:
     acme:
       email: \"$EMAIL\"
@@ -215,18 +212,15 @@ sudo bash -c \"cat << PROD >> /etc/traefik/traefik.yml
           - \"8.8.8.8:53\"
 PROD\"
 
-# Remove staging certificates
 echo 'Removing staging certificates...'
 sudo rm -f /etc/traefik/certs/cloudflare-acme-staging.json
-
-# Restart Traefik to apply changes
 echo 'Restarting Traefik...'
 sudo systemctl restart traefik
 
 echo 'Production setup complete.'
 EOF"
 
-# Make the promotion script executable
+# Make the production promotion script executable
 sudo chmod +x /usr/local/bin/promote_to_production.sh
 
 echo "Setup completed. Access your Ghost blog at https://$DOMAIN"
