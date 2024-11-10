@@ -140,12 +140,13 @@ providers:
     watch: true
 EOF"
 
-# Dynamic Traefik configuration for Ghost
+# Dynamic Traefik configuration for Ghost (dynamic.yml)
+echo "Creating dynamic configuration for Ghost..."
 sudo bash -c "cat << EOF > /etc/traefik/conf/dynamic.yml
 http:
   routers:
     ghost:
-      rule: 'Host(\`$DOMAIN\`)'
+      rule: \"Host(\`$DOMAIN\`)\"
       entryPoints:
         - websecure
       service: ghost
@@ -156,12 +157,13 @@ http:
     ghost:
       loadBalancer:
         servers:
-          - url: 'http://127.0.0.1:2368'
+          - url: \"http://127.0.0.1:2368\"
 EOF"
 
 # Set restrictive permissions on sensitive files
 echo "Setting restrictive permissions on Traefik configuration files..."
-sudo chmod 600 /etc/traefik/traefik.yml /etc/traefik/certs/cloudflare-acme-staging.json
+sudo chmod 600 /etc/traefik/traefik.yml /etc/traefik/certs/cloudflare-acme-staging.json /etc/traefik/conf/dynamic.yml
+sudo chown root:root /etc/traefik/traefik.yml /etc/traefik/certs/cloudflare-acme-staging.json /etc/traefik/conf/dynamic.yml
 
 # Cloudflare API token set as an environment variable in Traefik service
 echo "Creating secure systemd service for Traefik with Cloudflare token..."
@@ -182,6 +184,7 @@ EOF"
 
 # Secure permissions for the Traefik service file
 sudo chmod 600 /etc/systemd/system/traefik.service
+sudo chown root:root /etc/systemd/system/traefik.service
 
 # Start and enable Traefik
 echo "Starting Traefik..."
