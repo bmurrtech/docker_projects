@@ -21,9 +21,12 @@ function prompt_input {
 
 # Prompt user for variables
 prompt_input EMAIL "Enter your email for Let's Encrypt notifications"
-prompt_input DOMAIN "Enter your domain for the Ghost site"
+prompt_input DOMAIN "Enter your domain for the Ghost site (e.g., https://yourdomain.com)"
 prompt_input CF_API_TOKEN "Enter your Cloudflare API token"
-prompt_input MYSQL_ROOT_PASSWORD "Enter a secure MySQL root password for Ghost"
+prompt_input MYSQL_ROOT_PASSWORD "Enter a secure MySQL root password"
+prompt_input GHOST_DB_NAME "Enter a name for the Ghost database (e.g., ghost_prod)"
+prompt_input GHOST_DB_USER "Enter a MySQL username for Ghost (e.g., ghost_user)"
+prompt_input GHOST_DB_PASSWORD "Enter a password for the Ghost MySQL user"
 
 # Confirm installation settings
 echo "Summary of configuration:"
@@ -31,6 +34,9 @@ echo "Email: $EMAIL"
 echo "Domain: $DOMAIN"
 echo "Cloudflare API Token: (hidden for security)"
 echo "MySQL Root Password: (hidden for security)"
+echo "Ghost Database Name: $GHOST_DB_NAME"
+echo "Ghost Database User: $GHOST_DB_USER"
+echo "Ghost Database User Password: (hidden for security)"
 echo "Is this configuration correct? (y/n)"
 read -n 1 final_confirm
 echo
@@ -43,24 +49,29 @@ fi
 echo "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 
-# Install MySQL 8 with restrictive access
-echo "Installing MySQL 8 and configuring for secure local-only access..."
+# Install MySQL 8
+echo "Installing MySQL 8..."
 wget https://dev.mysql.com/get/mysql-apt-config_0.8.22-1_all.deb
 sudo dpkg -i mysql-apt-config_0.8.22-1_all.deb
 sudo apt update
 sudo apt install -y mysql-server
 rm mysql-apt-config_0.8.22-1_all.deb
 
-# Configure MySQL root password and restrict MySQL access to localhost only
-echo "Configuring MySQL for password authentication and localhost-only access..."
+# Configure MySQL root user for password authentication
+echo "Configuring MySQL root user to use password authentication..."
 sudo mysql <<EOF
 ALTER USER 'root'@'localhost' IDENTIFIED WITH 'mysql_native_password' BY '$MYSQL_ROOT_PASSWORD';
 FLUSH PRIVILEGES;
 EOF
 
-# Modify MySQL configuration for localhost-only access
-sudo sed -i 's/^bind-address\s*=.*/bind-address = 127.0.0.1/' /etc/mysql/mysql.conf.d/mysqld.cnf
-sudo systemctl restart mysql
+# Create a dedicated Ghost database and user
+echo "Creating Ghost database and user..."
+sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" <<EOF
+CREATE DATABASE $GHOST_DB_NAME;
+CREATE USER '$GHOST_DB_USER'@'localhost' IDENTIFIED BY '$GHOST_DB_PASSWORD';
+GRANT ALL PRIVILEGES ON $GHOST_DB_NAME.* TO '$GHOST_DB_USER'@'localhost';
+FLUSH PRIVILEGES;
+EOF
 
 # Install Node.js (Node 18) for Ghost
 echo "Setting up Node.js 18..."
@@ -72,19 +83,23 @@ sudo apt install -y nodejs
 
 # Install Ghost CLI
 echo "Installing Ghost CLI..."
-sudo npm install -g ghost-cli
+sudo npm install -g ghost-cli@latest
 
-# Create a new directory for Ghost
-echo "Creating Ghost directory..."
+# Ensure the Ghost installation directory has correct permissions
+echo "Creating and setting up Ghost installation directory..."
 sudo mkdir -p /var/www/ghost
 sudo chown $USER:$USER /var/www/ghost
-
-# Navigate to the Ghost directory
+sudo chmod 755 /var/www/ghost
 cd /var/www/ghost
 
-# Install Ghost with HTTPS using Traefik as reverse proxy
-echo "Installing Ghost..."
-ghost install --no-prompt --db=mysql --url="https://$DOMAIN" --dbhost=localhost --dbuser=root --dbpass="$MYSQL_ROOT_PASSWORD" --dbname=ghost_prod --process=systemd --no-setup-nginx --no-setup-ssl
+# Echo instructions to manually verify Ghost installation
+echo "Ghost setup instructions:"
+echo "Run the following command to install Ghost in /var/www/ghost and follow the prompts to configure it:"
+echo "  ghost install --db=mysql --dbhost=localhost --dbuser=$GHOST_DB_USER --dbpass=$GHOST_DB_PASSWORD --dbname=$GHOST_DB_NAME --process=systemd --no-setup-nginx --no-setup-ssl --url=\"$DOMAIN\""
+echo
+echo "After completing the Ghost setup, manually verify it by running:"
+echo "  ghost status"
+echo "and check that your site is accessible at $DOMAIN."
 
 # Download and install Traefik
 echo "Downloading and installing Traefik..."
@@ -141,7 +156,6 @@ providers:
 EOF"
 
 # Dynamic Traefik configuration for Ghost (dynamic.yml)
-echo "Creating dynamic configuration for Ghost..."
 sudo bash -c "cat << EOF > /etc/traefik/conf/dynamic.yml
 http:
   routers:
@@ -192,39 +206,6 @@ sudo systemctl daemon-reload
 sudo systemctl start traefik
 sudo systemctl enable traefik
 
-# Create the production promotion script
-echo "Creating production promotion script..."
-sudo bash -c "cat << EOF > /usr/local/bin/promote_to_production.sh
-#!/bin/bash
-
-echo 'Switching to production certificate resolver...'
-sudo sed -i 's/certResolver: staging/certResolver: production/' /etc/traefik/conf/dynamic.yml
-sudo sed -i 's/certificatesResolvers.staging/certificatesResolvers.production/' /etc/traefik/traefik.yml
-
-sudo bash -c \"cat << PROD >> /etc/traefik/traefik.yml
-  production:
-    acme:
-      email: \"$EMAIL\"
-      storage: \"/etc/traefik/certs/cloudflare-acme-production.json\"
-      caServer: \"https://acme-v02.api.letsencrypt.org/directory\"
-      dnsChallenge:
-        provider: cloudflare
-        delayBeforeCheck: 0
-        resolvers:
-          - \"1.1.1.1:53\"
-          - \"8.8.8.8:53\"
-PROD\"
-
-echo 'Removing staging certificates...'
-sudo rm -f /etc/traefik/certs/cloudflare-acme-staging.json
-echo 'Restarting Traefik...'
-sudo systemctl restart traefik
-
-echo 'Production setup complete.'
-EOF"
-
-# Make the production promotion script executable
-sudo chmod +x /usr/local/bin/promote_to_production.sh
-
-echo "Setup completed. Access your Ghost blog at https://$DOMAIN"
-echo "After testing staging, run 'sudo /usr/local/bin/promote_to_production.sh' to switch to production."
+# Completion message
+echo "Setup completed. After manually installing Ghost as instructed above, verify the installation by running 'ghost status' and checking your site at $DOMAIN."
+echo "For production, run 'sudo /usr/local/bin/promote_to_production.sh' to switch to production certificates after confirming that everything works in staging mode."
