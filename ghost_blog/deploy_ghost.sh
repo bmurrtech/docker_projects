@@ -6,8 +6,9 @@ function prompt_input {
     local prompt_text="$2"
     local user_input
     while true; do
-        read -p "$prompt_text: " user_input
-        echo "You entered: $user_input. Is this correct? (y/n)"
+        read -s -p "$prompt_text: " user_input  # -s hides input
+        echo
+        echo "You entered: [hidden for security]. Is this correct? (y/n)"
         read -n 1 correct
         echo
         if [[ $correct == "y" || $correct == "Y" ]]; then
@@ -28,6 +29,10 @@ prompt_input GHOST_DB_NAME "Enter a name for the Ghost database (e.g., ghost_pro
 prompt_input GHOST_DB_USER "Enter a MySQL username for Ghost (e.g., ghost_user)"
 prompt_input GHOST_DB_PASSWORD "Enter a password for the Ghost MySQL user"
 
+# Prompt for the new user's username and password
+prompt_input GHOST_USER "Enter the desired username for the new user"
+prompt_input GHOST_USER_PASSWORD "Enter a password for the new user (this will not be echoed)"
+
 # Confirm installation settings
 echo "Summary of configuration:"
 echo "Email: $EMAIL"
@@ -37,6 +42,7 @@ echo "MySQL Root Password: (hidden for security)"
 echo "Ghost Database Name: $GHOST_DB_NAME"
 echo "Ghost Database User: $GHOST_DB_USER"
 echo "Ghost Database User Password: (hidden for security)"
+echo "New User: $GHOST_USER"
 echo "Is this configuration correct? (y/n)"
 read -n 1 final_confirm
 echo
@@ -48,6 +54,16 @@ fi
 # Update system packages
 echo "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
+
+# Create the new user and add to sudoers group
+echo "Creating new user $GHOST_USER and adding to sudoers group..."
+sudo useradd -m -s /bin/bash $GHOST_USER
+echo "$GHOST_USER:$GHOST_USER_PASSWORD" | sudo chpasswd
+sudo usermod -aG sudo $GHOST_USER
+
+# Switch to the new user
+echo "Switching to the new user $GHOST_USER..."
+sudo su - $GHOST_USER
 
 # Install MySQL 8
 echo "Installing MySQL 8..."
@@ -73,6 +89,13 @@ GRANT ALL PRIVILEGES ON $GHOST_DB_NAME.* TO '$GHOST_DB_USER'@'localhost';
 FLUSH PRIVILEGES;
 EOF
 
+# Fix the authentication plugin for ghostuser
+echo "Changing authentication plugin for Ghost user to mysql_native_password..."
+sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" <<EOF
+ALTER USER '$GHOST_DB_USER'@'localhost' IDENTIFIED WITH mysql_native_password BY '$GHOST_DB_PASSWORD';
+FLUSH PRIVILEGES;
+EOF
+
 # Install Node.js (Node 18) for Ghost
 echo "Setting up Node.js 18..."
 sudo mkdir -p /etc/apt/keyrings
@@ -92,14 +115,33 @@ sudo chown $USER:$USER /var/www/ghost
 sudo chmod 755 /var/www/ghost
 cd /var/www/ghost
 
-# Echo instructions to manually verify Ghost installation
-echo "Ghost setup instructions:"
-echo "Run the following command to install Ghost in /var/www/ghost and follow the prompts to configure it:"
-echo "  ghost install --db=mysql --dbhost=localhost --dbuser=$GHOST_DB_USER --dbpass=$GHOST_DB_PASSWORD --dbname=$GHOST_DB_NAME --process=systemd --no-setup-nginx --no-setup-ssl --url=\"$DOMAIN\""
-echo
-echo "After completing the Ghost setup, manually verify it by running:"
-echo "  ghost status"
-echo "and check that your site is accessible at $DOMAIN."
+# Run Ghost CLI installation
+echo "Running Ghost CLI install..."
+ghost install --db=mysql --dbhost=localhost --dbuser=$GHOST_DB_USER --dbpass=$GHOST_DB_PASSWORD --dbname=$GHOST_DB_NAME --process=systemd --no-setup-nginx --no-setup-ssl --url="$DOMAIN"
+
+# Modify the config.production.json to force IPv4
+echo "Modifying config.production.json to force IPv4 for MySQL connection..."
+sudo sed -i 's/"host": "localhost"/"host": "127.0.0.1"/' /var/www/ghost/config.production.json
+
+# Dynamic Traefik configuration for Ghost (dynamic.yml)
+echo "Creating Traefik dynamic.yml configuration..."
+sudo bash -c "cat <<EOF > /etc/traefik/conf/dynamic.yml
+http:
+  routers:
+    ghost:
+      rule: Host(\`\$DOMAIN\`)  # Correct variable expansion
+      entryPoints:
+        - websecure  # Ensure traffic is routed over HTTPS
+      service: ghost
+      tls:
+        certResolver: staging  # Use Let's Encrypt staging certificates for testing
+
+  services:
+    ghost:
+      loadBalancer:
+        servers:
+          - url: http://127.0.0.1:2368  # Ensure this is correct for your Ghost service
+EOF"
 
 # Download and install Traefik
 echo "Downloading and installing Traefik..."
@@ -160,7 +202,7 @@ sudo bash -c "cat << EOF > /etc/traefik/conf/dynamic.yml
 http:
   routers:
     ghost:
-      rule: \"Host(\`$DOMAIN\`)\"
+      rule: \"Host(\`$DOMAIN\`)\"  # Ensure this is pointing to your actual domain
       entryPoints:
         - websecure
       service: ghost
@@ -205,6 +247,10 @@ echo "Starting Traefik..."
 sudo systemctl daemon-reload
 sudo systemctl start traefik
 sudo systemctl enable traefik
+
+# Clear bash history to ensure no sensitive data is logged
+history -c
+history -w
 
 # Completion message
 echo "Setup completed. After manually installing Ghost as instructed above, verify the installation by running 'ghost status' and checking your site at $DOMAIN."
