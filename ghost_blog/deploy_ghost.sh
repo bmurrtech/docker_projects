@@ -22,16 +22,14 @@ function prompt_input {
 
 # Prompt user for variables
 prompt_input EMAIL "Enter your email for Let's Encrypt notifications"
-prompt_input DOMAIN "Enter your domain for the Ghost site (e.g., https://yourdomain.com)"
+prompt_input DOMAIN "Enter your domain for the Ghost site (e.g., blog.yourdomain.com)"
 prompt_input CF_API_TOKEN "Enter your Cloudflare API token"
 prompt_input MYSQL_ROOT_PASSWORD "Enter a secure MySQL root password"
 prompt_input GHOST_DB_NAME "Enter a name for the Ghost database (e.g., ghost_prod)"
-prompt_input GHOST_DB_USER "Enter a MySQL username for Ghost (e.g., ghost_user)"
+prompt_input GHOST_DB_USER "Enter a MySQL username for Ghost (e.g., ghostuser)"
 prompt_input GHOST_DB_PASSWORD "Enter a password for the Ghost MySQL user"
-
-# Prompt for the new user's username and password
-prompt_input GHOST_USER "Enter the desired username for the new user"
-prompt_input GHOST_USER_PASSWORD "Enter a password for the new user (this will not be echoed)"
+prompt_input HOME_IP "Enter your home IP address for SSH access"
+prompt_input GHOST_USER "Enter your sudo username (the user running this script)"
 
 # Confirm installation settings
 echo "Summary of configuration:"
@@ -42,7 +40,8 @@ echo "MySQL Root Password: (hidden for security)"
 echo "Ghost Database Name: $GHOST_DB_NAME"
 echo "Ghost Database User: $GHOST_DB_USER"
 echo "Ghost Database User Password: (hidden for security)"
-echo "New User: $GHOST_USER"
+echo "Home IP for SSH access: $HOME_IP"
+echo "Sudo User: $GHOST_USER"
 echo "Is this configuration correct? (y/n)"
 read -n 1 final_confirm
 echo
@@ -55,15 +54,68 @@ fi
 echo "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
 
-# Create the new user and add to sudoers group
-echo "Creating new user $GHOST_USER and adding to sudoers group..."
-sudo useradd -m -s /bin/bash $GHOST_USER
-echo "$GHOST_USER:$GHOST_USER_PASSWORD" | sudo chpasswd
-sudo usermod -aG sudo $GHOST_USER
+# Install UFW if not already installed
+echo "Installing UFW firewall..."
+sudo apt install ufw -y
 
-# Switch to the new user
-echo "Switching to the new user $GHOST_USER..."
-sudo su - $GHOST_USER
+# Configure UFW firewall rules
+echo "Configuring UFW firewall rules..."
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+
+# Allow HTTP and HTTPS traffic
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+
+# Allow SSH from your home IP
+sudo ufw allow from $HOME_IP to any port 22
+
+# Deny access to port 2236
+sudo ufw deny 2236
+
+# Enable UFW
+echo "Enabling UFW firewall..."
+sudo ufw --force enable
+
+# Harden SSH configuration
+echo "Hardening SSH configuration..."
+sudo sed -i "/^#*AllowUsers /d" /etc/ssh/sshd_config
+echo "AllowUsers $GHOST_USER" | sudo sudo tee -a /etc/ssh/sshd_config
+
+# Do not disable root login to avoid disconnecting current session
+# Instead, ensure only the specified user can SSH in
+# Copy SSH keys if necessary (assuming already done manually)
+
+# Restart SSH service
+echo "Restarting SSH service..."
+sudo systemctl restart sshd
+
+# Install and configure Fail2Ban
+echo "Installing and configuring Fail2Ban..."
+sudo apt install fail2ban -y
+sudo systemctl enable fail2ban
+sudo systemctl start fail2ban
+
+# Configure Fail2Ban to ignore home IP
+echo "Configuring Fail2Ban to ignore your home IP..."
+sudo bash -c "cat <<EOF > /etc/fail2ban/jail.local
+[DEFAULT]
+ignoreip = 127.0.0.1/8 $HOME_IP
+EOF"
+
+# Restart Fail2Ban service
+sudo systemctl restart fail2ban
+
+# Secure shared memory
+echo "Securing shared memory..."
+if ! grep -q 'tmpfs /run/shm tmpfs defaults,noexec,nosuid 0 0' /etc/fstab; then
+    sudo bash -c "echo 'tmpfs /run/shm tmpfs defaults,noexec,nosuid 0 0' >> /etc/fstab"
+fi
+
+# Install unattended-upgrades
+echo "Installing unattended-upgrades for automatic security updates..."
+sudo apt install unattended-upgrades -y
+sudo dpkg-reconfigure --priority=low unattended-upgrades
 
 # Install MySQL 8
 echo "Installing MySQL 8..."
@@ -75,26 +127,26 @@ rm mysql-apt-config_0.8.22-1_all.deb
 
 # Configure MySQL root user for password authentication
 echo "Configuring MySQL root user to use password authentication..."
-sudo mysql <<EOF
+sudo mysql <<MYSQL_EOF
 ALTER USER 'root'@'localhost' IDENTIFIED WITH 'mysql_native_password' BY '$MYSQL_ROOT_PASSWORD';
 FLUSH PRIVILEGES;
-EOF
+MYSQL_EOF
 
 # Create a dedicated Ghost database and user
 echo "Creating Ghost database and user..."
-sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" <<EOF
+sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_EOF
 CREATE DATABASE $GHOST_DB_NAME;
 CREATE USER '$GHOST_DB_USER'@'localhost' IDENTIFIED BY '$GHOST_DB_PASSWORD';
 GRANT ALL PRIVILEGES ON $GHOST_DB_NAME.* TO '$GHOST_DB_USER'@'localhost';
 FLUSH PRIVILEGES;
-EOF
+MYSQL_EOF
 
-# Fix the authentication plugin for ghostuser
+# Fix the authentication plugin for Ghost user
 echo "Changing authentication plugin for Ghost user to mysql_native_password..."
-sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" <<EOF
+sudo mysql -u root -p"$MYSQL_ROOT_PASSWORD" <<MYSQL_EOF
 ALTER USER '$GHOST_DB_USER'@'localhost' IDENTIFIED WITH mysql_native_password BY '$GHOST_DB_PASSWORD';
 FLUSH PRIVILEGES;
-EOF
+MYSQL_EOF
 
 # Install Node.js (Node 18) for Ghost
 echo "Setting up Node.js 18..."
@@ -111,8 +163,13 @@ sudo npm install -g ghost-cli@latest
 # Ensure the Ghost installation directory has correct permissions
 echo "Creating and setting up Ghost installation directory..."
 sudo mkdir -p /var/www/ghost
-sudo chown $USER:$USER /var/www/ghost
+sudo chown $GHOST_USER:$GHOST_USER /var/www/ghost
 sudo chmod 755 /var/www/ghost
+
+# Remove contents of /var/www/ghost but not the folder
+echo "Cleaning up /var/www/ghost directory..."
+sudo rm -rf /var/www/ghost/*
+
 cd /var/www/ghost
 
 # Run Ghost CLI installation
@@ -129,18 +186,18 @@ sudo bash -c "cat <<EOF > /etc/traefik/conf/dynamic.yml
 http:
   routers:
     ghost:
-      rule: Host(\`\$DOMAIN\`)  # Correct variable expansion
+      rule: Host(\\\"\$DOMAIN\\\")
       entryPoints:
-        - websecure  # Ensure traffic is routed over HTTPS
+        - websecure
       service: ghost
       tls:
-        certResolver: staging  # Use Let's Encrypt staging certificates for testing
+        certResolver: staging
 
   services:
     ghost:
       loadBalancer:
         servers:
-          - url: http://127.0.0.1:2368  # Ensure this is correct for your Ghost service
+          - url: http://127.0.0.1:2368
 EOF"
 
 # Download and install Traefik
@@ -181,19 +238,19 @@ entryPoints:
 certificatesResolvers:
   staging:
     acme:
-      email: "$EMAIL"
-      storage: "/etc/traefik/certs/cloudflare-acme-staging.json"
-      caServer: "https://acme-staging-v02.api.letsencrypt.org/directory"
+      email: \"$EMAIL\"
+      storage: \"/etc/traefik/certs/cloudflare-acme-staging.json\"
+      caServer: \"https://acme-staging-v02.api.letsencrypt.org/directory\"
       dnsChallenge:
         provider: cloudflare
         delayBeforeCheck: 0
         resolvers:
-          - "1.1.1.1:53"
-          - "8.8.8.8:53"
+          - \"1.1.1.1:53\"
+          - \"8.8.8.8:53\"
 
 providers:
   file:
-    directory: "/etc/traefik/conf"
+    directory: \"/etc/traefik/conf\"
     watch: true
 EOF"
 
@@ -202,7 +259,7 @@ sudo bash -c "cat << EOF > /etc/traefik/conf/dynamic.yml
 http:
   routers:
     ghost:
-      rule: \"Host(\`$DOMAIN\`)\"  # Ensure this is pointing to your actual domain
+      rule: \"Host(\\\`$DOMAIN\\\`)\"
       entryPoints:
         - websecure
       service: ghost
@@ -249,9 +306,13 @@ sudo systemctl start traefik
 sudo systemctl enable traefik
 
 # Clear bash history to ensure no sensitive data is logged
+echo "Clearing bash history..."
 history -c
 history -w
 
 # Completion message
-echo "Setup completed. After manually installing Ghost as instructed above, verify the installation by running 'ghost status' and checking your site at $DOMAIN."
+echo "Setup completed."
+echo "You may need to run the following command to start Ghost:"
+echo "cd /var/www/ghost && ghost start"
+echo "Verify the installation by running 'ghost status' and checking your site at https://$DOMAIN."
 echo "For production, run 'sudo /usr/local/bin/promote_to_production.sh' to switch to production certificates after confirming that everything works in staging mode."
