@@ -79,12 +79,10 @@ sudo ufw --force enable
 
 # Harden SSH configuration
 echo "Hardening SSH configuration..."
-sudo sed -i "/^#*AllowUsers /d" /etc/ssh/sshd_config
-echo "AllowUsers $GHOST_USER" | sudo sudo tee -a /etc/ssh/sshd_config
-
-# Do not disable root login to avoid disconnecting current session
-# Instead, ensure only the specified user can SSH in
-# Copy SSH keys if necessary (assuming already done manually)
+sudo sed -i 's/^#*PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config
+sudo sed -i 's/^#*PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sudo sed -i 's/^#*ChallengeResponseAuthentication .*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
+sudo sed -i 's/^#*UsePAM .*/UsePAM no/' /etc/ssh/sshd_config
 
 # Restart SSH service
 echo "Restarting SSH service..."
