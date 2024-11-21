@@ -30,9 +30,6 @@ prompt_input GHOST_DB_USER "Enter a MySQL username for Ghost (e.g., ghostuser)"
 prompt_input GHOST_DB_PASSWORD "Enter a password for the Ghost MySQL user"
 prompt_input HOME_IP "Enter your home IP address for SSH access"
 prompt_input GHOST_USER "Enter your sudo username (the user running this script)"
-prompt_input MAILGUN_USER "Enter your Mailgun SMTP username (e.g., postmaster@example.mailgun.org)"
-prompt_input MAILGUN_PW "Enter your Mailgun SMTP password"
-prompt_input ORG_NAME "Enter your organization name (used as the sender of newsletters)"
 
 # Confirm installation settings
 echo "Summary of configuration:"
@@ -45,9 +42,6 @@ echo "Ghost Database User: $GHOST_DB_USER"
 echo "Ghost Database User Password: (hidden for security)"
 echo "Home IP for SSH access: $HOME_IP"
 echo "Sudo User: $GHOST_USER"
-echo "Mailgun SMTP User: $MAILGUN_USER"
-echo "Mailgun SMTP Password: (hidden for security)"
-echo "Organization Name: $ORG_NAME"
 echo "Is this configuration correct? (y/n)"
 read -n 1 final_confirm
 echo
@@ -198,6 +192,21 @@ ALTER USER '$GHOST_DB_USER'@'localhost' IDENTIFIED WITH mysql_native_password BY
 FLUSH PRIVILEGES;
 MYSQL_EOF
 
+# Add custom MySQL performance configurations
+echo "Adding custom MySQL performance settings..."
+sudo bash -c "cat << EOF > /etc/mysql/mysql.conf.d/99-custom.cnf
+[mysqld]
+innodb_buffer_pool_size = 256M
+key_buffer_size = 16M
+sort_buffer_size = 1M
+read_buffer_size = 1M
+innodb_log_buffer_size = 8M
+EOF"
+
+# Restart MySQL to apply changes
+echo "Restarting MySQL service to apply new configurations..."
+sudo systemctl restart mysql
+
 # Install Node.js (Node 18) for Ghost
 echo "Setting up Node.js 18..."
 sudo mkdir -p /etc/apt/keyrings
@@ -224,18 +233,11 @@ cd /var/www/ghost
 
 # Run Ghost CLI installation
 echo "Running Ghost CLI install..."
-ghost install --db=mysql --dbhost=localhost --dbuser=$GHOST_DB_USER --dbpass=$GHOST_DB_PASSWORD --dbname=$GHOST_DB_NAME --process=systemd --no-setup-nginx --no-setup-ssl --url="https://$DOMAIN"
+ghost install --db=mysql --dbhost=localhost --dbuser=$GHOST_DB_USER --dbpass=$GHOST_DB_PASSWORD --dbname=$GHOST_DB_NAME --process=systemd --no-setup-nginx --no-setup-ssl --url="$DOMAIN"
 
-# Modify the config.production.json to force IPv4 and add Mailgun configuration
-echo "Modifying config.production.json..."
+# Modify the config.production.json to force IPv4
+echo "Modifying config.production.json to force IPv4 for MySQL connection..."
 sudo sed -i 's/"host": "localhost"/"host": "127.0.0.1"/' /var/www/ghost/config.production.json
-
-# Add Mailgun configuration to config.production.json
-sudo sed -i 's/^\(}\)$/  ,\n  "mail": {\n    "transport": "SMTP",\n    "options": {\n      "service": "Mailgun",\n      "host": "smtp.mailgun.org",\n      "port": 465,\n      "secure": true,\n      "auth": {\n        "user": "'"$MAILGUN_USER"'",\n        "pass": "'"$MAILGUN_PW"'"\n      }\n    },\n    "from": "'"$ORG_NAME"' <'"$EMAIL"'>"\n  }\n\1/' /var/www/ghost/config.production.json
-
-# Restart Ghost to apply changes
-echo "Restarting Ghost..."
-ghost restart
 
 # Download and install Traefik
 echo "Downloading and installing Traefik..."
@@ -247,10 +249,6 @@ rm traefik_v2.10.1_linux_amd64.tar.gz
 # Create Traefik configuration directories
 echo "Creating Traefik configuration directories..."
 sudo mkdir -p /etc/traefik /etc/traefik/conf /etc/traefik/certs
-
-# Create empty ACME storage file
-echo "Creating empty ACME storage file..."
-sudo touch /etc/traefik/certs/cloudflare-acme-staging.json
 
 # Update Traefik configuration to enable logging
 echo "Updating Traefik configuration to enable logging..."
@@ -264,7 +262,7 @@ log:
   format: common
   filePath: \"/var/log/traefik.log\"
 
-accessLog:
+accesslog:
   format: common
   filePath: \"/var/log/traefik_access.log\"
 
@@ -298,38 +296,16 @@ providers:
     watch: true
 EOF"
 
-# Create Traefik dynamic configuration with CORS settings
+# Dynamic Traefik configuration for Ghost (dynamic.yml)
 echo "Creating Traefik dynamic.yml configuration..."
 sudo bash -c "cat << EOF > /etc/traefik/conf/dynamic.yml
 http:
-  middlewares:
-    cors:
-      headers:
-        accessControlAllowOriginList:
-          - \"https://$DOMAIN\"
-        accessControlAllowMethods:
-          - \"GET\"
-          - \"POST\"
-          - \"OPTIONS\"
-        accessControlAllowHeaders:
-          - \"Content-Type\"
-          - \"Authorization\"
-          - \"X-Requested-With\"
-          - \"Accept\"
-          - \"Origin\"
-          - \"Referer\"
-          - \"User-Agent\"
-        accessControlAllowCredentials: true
-        accessControlMaxAge: 3600
-
   routers:
     ghost:
-      rule: \"Host(\`$DOMAIN\`)\"
+      rule: \"Host(\\\`$DOMAIN\\\`)\"
       entryPoints:
         - websecure
       service: ghost
-      middlewares:
-        - cors
       tls:
         certResolver: staging
 
@@ -342,12 +318,8 @@ EOF"
 
 # Set restrictive permissions on sensitive files
 echo "Setting restrictive permissions on Traefik configuration files..."
-sudo chmod 600 /etc/traefik/traefik.yml \
-    /etc/traefik/conf/dynamic.yml \
-    /etc/traefik/certs/cloudflare-acme-staging.json
-sudo chown root:root /etc/traefik/traefik.yml \
-    /etc/traefik/conf/dynamic.yml \
-    /etc/traefik/certs/cloudflare-acme-staging.json
+sudo chmod 600 /etc/traefik/traefik.yml /etc/traefik/certs/cloudflare-acme-staging.json /etc/traefik/conf/dynamic.yml
+sudo chown root:root /etc/traefik/traefik.yml /etc/traefik/certs/cloudflare-acme-staging.json /etc/traefik/conf/dynamic.yml
 
 # Cloudflare API token set as an environment variable in Traefik service
 echo "Creating secure systemd service for Traefik with Cloudflare token..."
