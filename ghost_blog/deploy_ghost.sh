@@ -6,16 +6,16 @@ function prompt_input {
     local prompt_text="$2"
     local user_input
     while true; do
-        read -s -p "$prompt_text: " user_input  # -s hides input
+        read -p "$prompt_text: " user_input
         echo
-        echo "You entered: [hidden for security]. Is this correct? (y/n)"
+        echo "Is \"$user_input\" correct for $var_name? (y/n)"
         read -n 1 correct
         echo
         if [[ $correct == "y" || $correct == "Y" ]]; then
             eval "$var_name='$user_input'"
             break
         else
-            echo "Please re-enter the $var_name."
+            echo "Please re-enter $var_name."
         fi
     done
 }
@@ -35,7 +35,7 @@ prompt_input GHOST_USER "Enter your sudo username (the user running this script)
 echo "Summary of configuration:"
 echo "Email: $EMAIL"
 echo "Domain: $DOMAIN"
-echo "Cloudflare API Token: (hidden for security)"
+echo "Cloudflare API Token: $CF_API_TOKEN"
 echo "MySQL Root Password: (hidden for security)"
 echo "Ghost Database Name: $GHOST_DB_NAME"
 echo "Ghost Database User: $GHOST_DB_USER"
@@ -50,9 +50,32 @@ if [[ $final_confirm != "y" && $final_confirm != "Y" ]]; then
     exit 1
 fi
 
+# Check if the user is in the sudo group
+if id -nG "$GHOST_USER" | grep -qw "sudo"; then
+    echo "$GHOST_USER is in the sudo group."
+else
+    echo "Error: $GHOST_USER is not in the sudo group."
+    echo "Please add $GHOST_USER to the sudo group using the following command:"
+    echo "sudo usermod -aG sudo $GHOST_USER"
+    echo "Then re-run this script."
+    exit 1
+fi
+
 # Update system packages
 echo "Updating system packages..."
 sudo apt update && sudo apt upgrade -y
+
+# Disable IPv6
+echo "Disabling IPv6..."
+if ! grep -q "disable_ipv6" /etc/sysctl.conf; then
+    sudo bash -c "cat << EOF >> /etc/sysctl.conf
+
+# Disable IPv6
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+EOF"
+    sudo sysctl -p
+fi
 
 # Install UFW if not already installed
 echo "Installing UFW firewall..."
@@ -83,6 +106,8 @@ sudo sed -i 's/^#*PermitRootLogin .*/PermitRootLogin no/' /etc/ssh/sshd_config
 sudo sed -i 's/^#*PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
 sudo sed -i 's/^#*ChallengeResponseAuthentication .*/ChallengeResponseAuthentication no/' /etc/ssh/sshd_config
 sudo sed -i 's/^#*UsePAM .*/UsePAM no/' /etc/ssh/sshd_config
+sudo sed -i "/^#*AllowUsers /d" /etc/ssh/sshd_config
+echo "AllowUsers $GHOST_USER" | sudo tee -a /etc/ssh/sshd_config
 
 # Restart SSH service
 echo "Restarting SSH service..."
@@ -91,17 +116,38 @@ sudo systemctl restart sshd
 # Install and configure Fail2Ban
 echo "Installing and configuring Fail2Ban..."
 sudo apt install fail2ban -y
-sudo systemctl enable fail2ban
-sudo systemctl start fail2ban
 
-# Configure Fail2Ban to ignore home IP
-echo "Configuring Fail2Ban to ignore your home IP..."
+# Configure Fail2Ban to ignore home IP and add filters for MySQL and Traefik
+echo "Configuring Fail2Ban..."
 sudo bash -c "cat <<EOF > /etc/fail2ban/jail.local
 [DEFAULT]
 ignoreip = 127.0.0.1/8 $HOME_IP
+
+[mysqld-auth]
+enabled = true
+filter = mysqld-auth
+logpath = /var/log/mysql/error.log
+maxretry = 5
+bantime = 600
+
+[traefik]
+enabled = true
+filter = traefik
+logpath = /var/log/traefik.log
+maxretry = 5
+bantime = 600
+EOF"
+
+# Create Fail2Ban filter for Traefik
+echo "Creating Fail2Ban filter for Traefik..."
+sudo bash -c "cat << EOF > /etc/fail2ban/filter.d/traefik.conf
+[Definition]
+failregex = ^.*level=error msg=\".*\".*remoteAddr=\"<HOST>\".*
+ignoreregex =
 EOF"
 
 # Restart Fail2Ban service
+sudo systemctl enable fail2ban
 sudo systemctl restart fail2ban
 
 # Secure shared memory
@@ -118,9 +164,9 @@ sudo dpkg-reconfigure --priority=low unattended-upgrades
 # Install MySQL 8
 echo "Installing MySQL 8..."
 wget https://dev.mysql.com/get/mysql-apt-config_0.8.22-1_all.deb
-sudo dpkg -i mysql-apt-config_0.8.22-1_all.deb
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i mysql-apt-config_0.8.22-1_all.deb
 sudo apt update
-sudo apt install -y mysql-server
+sudo DEBIAN_FRONTEND=noninteractive apt install -y mysql-server
 rm mysql-apt-config_0.8.22-1_all.deb
 
 # Configure MySQL root user for password authentication
@@ -178,38 +224,8 @@ ghost install --db=mysql --dbhost=localhost --dbuser=$GHOST_DB_USER --dbpass=$GH
 echo "Modifying config.production.json to force IPv4 for MySQL connection..."
 sudo sed -i 's/"host": "localhost"/"host": "127.0.0.1"/' /var/www/ghost/config.production.json
 
-# Dynamic Traefik configuration for Ghost (dynamic.yml)
-echo "Creating Traefik dynamic.yml configuration..."
-sudo bash -c "cat <<EOF > /etc/traefik/conf/dynamic.yml
-http:
-  routers:
-    ghost:
-      rule: Host(\\\"\$DOMAIN\\\")
-      entryPoints:
-        - websecure
-      service: ghost
-      tls:
-        certResolver: staging
-
-  services:
-    ghost:
-      loadBalancer:
-        servers:
-          - url: http://127.0.0.1:2368
-EOF"
-
-# Download and install Traefik
-echo "Downloading and installing Traefik..."
-wget https://github.com/traefik/traefik/releases/download/v2.10.1/traefik_v2.10.1_linux_amd64.tar.gz
-tar -xvzf traefik_v2.10.1_linux_amd64.tar.gz
-sudo mv traefik /usr/local/bin/
-rm traefik_v2.10.1_linux_amd64.tar.gz
-
-# Create Traefik configuration files
-echo "Configuring Traefik for HTTPS with Cloudflare DNS challenge..."
-sudo mkdir -p /etc/traefik /etc/traefik/conf /etc/traefik/certs
-
-# Main Traefik configuration with HTTPS and Let's Encrypt staging
+# Update Traefik configuration to enable logging to files
+echo "Updating Traefik configuration to enable logging..."
 sudo bash -c "cat << EOF > /etc/traefik/traefik.yml
 global:
   checkNewVersion: true
@@ -218,9 +234,11 @@ global:
 log:
   level: ERROR
   format: common
+  filePath: \"/var/log/traefik.log\"
 
 accesslog:
   format: common
+  filePath: \"/var/log/traefik_access.log\"
 
 entryPoints:
   web:
@@ -253,6 +271,7 @@ providers:
 EOF"
 
 # Dynamic Traefik configuration for Ghost (dynamic.yml)
+echo "Creating Traefik dynamic.yml configuration..."
 sudo bash -c "cat << EOF > /etc/traefik/conf/dynamic.yml
 http:
   routers:
