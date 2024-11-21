@@ -224,7 +224,18 @@ ghost install --db=mysql --dbhost=localhost --dbuser=$GHOST_DB_USER --dbpass=$GH
 echo "Modifying config.production.json to force IPv4 for MySQL connection..."
 sudo sed -i 's/"host": "localhost"/"host": "127.0.0.1"/' /var/www/ghost/config.production.json
 
-# Update Traefik configuration to enable logging to files
+# Download and install Traefik
+echo "Downloading and installing Traefik..."
+wget https://github.com/traefik/traefik/releases/download/v2.10.1/traefik_v2.10.1_linux_amd64.tar.gz
+tar -xvzf traefik_v2.10.1_linux_amd64.tar.gz
+sudo mv traefik /usr/local/bin/
+rm traefik_v2.10.1_linux_amd64.tar.gz
+
+# Create Traefik configuration directories
+echo "Creating Traefik configuration directories..."
+sudo mkdir -p /etc/traefik /etc/traefik/conf /etc/traefik/certs
+
+# Update Traefik configuration to enable logging
 echo "Updating Traefik configuration to enable logging..."
 sudo bash -c "cat << EOF > /etc/traefik/traefik.yml
 global:
