@@ -86,9 +86,9 @@ echo "Configuring UFW firewall rules..."
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
 
-# Allow HTTP and HTTPS traffic
-sudo ufw allow 80/tcp
-sudo ufw allow 443/tcp
+# Allow HTTP and HTTPS traffic with rate limiting
+sudo ufw limit 80/tcp
+sudo ufw limit 443/tcp
 
 # Allow SSH from your home IP
 sudo ufw allow from $HOME_IP to any port 22
@@ -117,18 +117,33 @@ sudo systemctl restart sshd
 echo "Installing and configuring Fail2Ban..."
 sudo apt install fail2ban -y
 
-# Configure Fail2Ban to ignore home IP and add filters for MySQL and Traefik
+# Configure Fail2Ban to ignore home IP and add filters for web traffic
 echo "Configuring Fail2Ban..."
 sudo bash -c "cat <<EOF > /etc/fail2ban/jail.local
 [DEFAULT]
 ignoreip = 127.0.0.1/8 $HOME_IP
-
-[mysqld-auth]
-enabled = true
-filter = mysqld-auth
-logpath = /var/log/mysql/error.log
+bantime = 3600
+findtime = 600
 maxretry = 5
-bantime = 600
+backend = auto
+
+[sshd]
+enabled = true
+filter = sshd
+logpath = /var/log/auth.log
+port = 22
+maxretry = 3
+
+[http-get-dos]
+enabled = true
+port = http,https
+filter = http-get-dos
+logpath = /var/log/nginx/access.log
+maxretry = 10
+findtime = 60
+bantime = 3600
+
+dosprotectaction = iptables-multiport
 
 [traefik]
 enabled = true
@@ -136,6 +151,14 @@ filter = traefik
 logpath = /var/log/traefik.log
 maxretry = 5
 bantime = 600
+EOF"
+
+# Create Fail2Ban filter for HTTP DoS attacks
+echo "Creating Fail2Ban filter for HTTP DoS..."
+sudo bash -c "cat << EOF > /etc/fail2ban/filter.d/http-get-dos.conf
+[Definition]
+failregex = ^<HOST> -.*"(GET|POST|HEAD).*"
+ignoreregex =
 EOF"
 
 # Create Fail2Ban filter for Traefik
@@ -149,6 +172,9 @@ EOF"
 # Restart Fail2Ban service
 sudo systemctl enable fail2ban
 sudo systemctl restart fail2ban
+
+# Summary of changes
+echo "Firewall and Fail2Ban configurations applied successfully!"
 
 # Secure shared memory
 echo "Securing shared memory..."
