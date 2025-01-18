@@ -14,26 +14,26 @@ Before running the script, ensure that you have configured your **Cloudflare DNS
 
 Ensure your user has sudo privileges to install necessary dependencies and make system-level changes.
 
-+++
+```
 sudo usermod -aG sudo your_username
-+++
+```
 
 ### 2. **Create a `/bin` Directory in Your User Directory**
 
 Create a directory for executable scripts in your user's home directory.
 
-+++
+```
 mkdir ~/bin
-+++
+```
 
 ### 3. **Download `deploy_ghost.sh` Script Using `wget`**
 
 Download the `deploy_ghost.sh` script from the raw GitHub URL. This script will automate the Ghost blog deployment.
 
-+++
+```
 cd ~/bin
 wget https://raw.githubusercontent.com/yourgithubusername/repositoryname/main/deploy_ghost.sh
-+++
+```
 
 **Note**: Replace `https://raw.githubusercontent.com/yourgithubusername/repositoryname/main/deploy_ghost.sh` with the actual raw URL of the `deploy_ghost.sh` script on GitHub.
 
@@ -41,17 +41,17 @@ wget https://raw.githubusercontent.com/yourgithubusername/repositoryname/main/de
 
 Make the `deploy_ghost.sh` script executable by changing its permissions.
 
-+++
+```
 chmod +x deploy_ghost.sh
-+++
+```
 
 ### 5. **Run the Script**
 
 Now, run the `deploy_ghost.sh` script to start the Ghost blog setup.
 
-+++
+```
 ./deploy_ghost.sh
-+++
+```
 
 The script will prompt you to provide the following information:
 - **Cloudflare API token** (with read and write permissions)
@@ -67,9 +67,9 @@ This script is used to promote the **Let's Encrypt staging certificate** to a **
 
 - **Note**: You need to **manually run** the `promote_to_production.sh` script after confirming the blog is functional and accessible to the public.
   
-+++
+```
 ./promote_to_production.sh
-+++
+```
 
 ### 7. **Rate Limit Caution for Let's Encrypt**
 
@@ -89,7 +89,6 @@ Let's Encrypt has a **rate limit of 5 certificate requests per week** for the sa
 
 - The **deploy_ghost.sh** script simplifies the process of deploying your Ghost blog with Cloudflare DNS, obtaining SSL certificates, and configuring your environment.
 - Always ensure that your blog is regularly updated to mitigate potential security risks, and consider setting up a backup strategy to make recovery easier in case of any issues.
-
 
 
 # Ghost Blog Deployment via Portainer
