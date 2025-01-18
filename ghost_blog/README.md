@@ -1,4 +1,97 @@
 
+# Ghost Blog Deployment Tutorial for Dedicated Server
+
+This tutorial explains how to deploy a **Ghost blog** on your dedicated server using a script that automates the setup process. It simplifies the steps and avoids using Portainer. It also helps in setting up **Cloudflare DNS**, obtaining SSL certificates from **Let's Encrypt**, and promoting the certificate to production.
+
+## Prerequisite
+Before running the script, ensure that you have configured your **Cloudflare DNS API** with both **read and write permissions** for managing the DNS challenge. This is necessary for the ACME certificate process.
+
+---
+
+## Step-by-Step Guide
+
+### 1. **Make Your User a Sudo User**
+
+Ensure your user has sudo privileges to install necessary dependencies and make system-level changes.
+
++++
+sudo usermod -aG sudo your_username
++++
+
+### 2. **Create a `/bin` Directory in Your User Directory**
+
+Create a directory for executable scripts in your user's home directory.
+
++++
+mkdir ~/bin
++++
+
+### 3. **Download `deploy_ghost.sh` Script Using `wget`**
+
+Download the `deploy_ghost.sh` script from the raw GitHub URL. This script will automate the Ghost blog deployment.
+
++++
+cd ~/bin
+wget https://raw.githubusercontent.com/yourgithubusername/repositoryname/main/deploy_ghost.sh
++++
+
+**Note**: Replace `https://raw.githubusercontent.com/yourgithubusername/repositoryname/main/deploy_ghost.sh` with the actual raw URL of the `deploy_ghost.sh` script on GitHub.
+
+### 4. **Make the Script Executable**
+
+Make the `deploy_ghost.sh` script executable by changing its permissions.
+
++++
+chmod +x deploy_ghost.sh
++++
+
+### 5. **Run the Script**
+
+Now, run the `deploy_ghost.sh` script to start the Ghost blog setup.
+
++++
+./deploy_ghost.sh
++++
+
+The script will prompt you to provide the following information:
+- **Cloudflare API token** (with read and write permissions)
+- **Email address** for **Let's Encrypt** certificate
+- **Domain name** for your Ghost blog (e.g., `blog.cybersoar.us`)
+- Other necessary details like database and Ghost configuration.
+
+### 6. **Promote to Production**
+
+After the blog is up and running, the script will create a **`promote_to_production.sh`** script inside the `/home/your_username/bin` folder.
+
+This script is used to promote the **Let's Encrypt staging certificate** to a **production-ready certificate**.
+
+- **Note**: You need to **manually run** the `promote_to_production.sh` script after confirming the blog is functional and accessible to the public.
+  
++++
+./promote_to_production.sh
++++
+
+### 7. **Rate Limit Caution for Let's Encrypt**
+
+Let's Encrypt has a **rate limit of 5 certificate requests per week** for the same domain. To avoid hitting the limit, the script uses the **staging server** for testing purposes by default.
+
+- **Staging Certificates** are **not trusted by browsers** but allow you to test the configuration. After confirming that the website is working fine, you should run the `promote_to_production.sh` script to issue a **production certificate** from Let's Encrypt.
+
+### 8. **Security Risk and Update Caution**
+
+**Security Risk**: If you don't keep your **Ghost blog** updated, your website will become vulnerable to security issues. It's recommended to either **set up a cron job** or manually update the blog to keep it patched.
+
+- **Cron Job Caution**: While setting up a **cron job** for updates is ideal for minor patches, it may not be suitable for **major version updates** that could potentially **break the site**. 
+
+- **Backup Caution**: Ensure you **back up** your blog regularly. If you don't have backups and a major update breaks the site, recovery can be difficult and time-consuming.
+
+### Conclusion
+
+- The **deploy_ghost.sh** script simplifies the process of deploying your Ghost blog with Cloudflare DNS, obtaining SSL certificates, and configuring your environment.
+- Always ensure that your blog is regularly updated to mitigate potential security risks, and consider setting up a backup strategy to make recovery easier in case of any issues.
+
+
+
 # Ghost Blog Deployment via Portainer
 
 This guide will walk you through deploying a Ghost blog with MySQL using Docker and Portainer. We'll use a GitHub repository to pull the `docker-compose.yml` directly from Portainer, and you'll create a local `.env` file to provide environment variables like database credentials and your domain name.
