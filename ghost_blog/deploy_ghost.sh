@@ -276,7 +276,7 @@ rm traefik_v2.10.1_linux_amd64.tar.gz
 echo "Creating Traefik configuration directories..."
 sudo mkdir -p /etc/traefik /etc/traefik/conf /etc/traefik/certs
 
-# Update Traefik configuration to enable logging
+# Update Traefik configuration to enable logging and add production cert resolver
 echo "Updating Traefik configuration to enable logging..."
 sudo bash -c "cat << EOF > /etc/traefik/traefik.yml
 global:
@@ -311,10 +311,26 @@ certificatesResolvers:
       caServer: \"https://acme-staging-v02.api.letsencrypt.org/directory\"
       dnsChallenge:
         provider: cloudflare
-        delayBeforeCheck: 0
+        # Increase delay to give DNS time to propagate
+        delayBeforeCheck: 60
         resolvers:
           - \"1.1.1.1:53\"
           - \"8.8.8.8:53\"
+          - \"8.8.4.4:53\"
+
+  production:
+    acme:
+      email: \"$EMAIL\"
+      storage: \"/etc/traefik/certs/cloudflare-acme-production.json\"
+      # Default Let's Encrypt production CA server
+      dnsChallenge:
+        provider: cloudflare
+        # Increase delay to give DNS time to propagate
+        delayBeforeCheck: 60
+        resolvers:
+          - \"1.1.1.1:53\"
+          - \"8.8.8.8:53\"
+          - \"8.8.4.4:53\"
 
 providers:
   file:
@@ -344,8 +360,15 @@ EOF"
 
 # Set restrictive permissions on sensitive files
 echo "Setting restrictive permissions on Traefik configuration files..."
-sudo chmod 600 /etc/traefik/traefik.yml /etc/traefik/certs/cloudflare-acme-staging.json /etc/traefik/conf/dynamic.yml
-sudo chown root:root /etc/traefik/traefik.yml /etc/traefik/certs/cloudflare-acme-staging.json /etc/traefik/conf/dynamic.yml
+sudo chmod 600 /etc/traefik/traefik.yml
+sudo chmod 600 /etc/traefik/conf/dynamic.yml
+sudo chown root:root /etc/traefik/traefik.yml /etc/traefik/conf/dynamic.yml
+
+# Create empty staging and production ACME storage files (to have correct perms)
+sudo touch /etc/traefik/certs/cloudflare-acme-staging.json
+sudo touch /etc/traefik/certs/cloudflare-acme-production.json
+sudo chmod 600 /etc/traefik/certs/cloudflare-acme-staging.json /etc/traefik/certs/cloudflare-acme-production.json
+sudo chown root:root /etc/traefik/certs/cloudflare-acme-staging.json /etc/traefik/certs/cloudflare-acme-production.json
 
 # Cloudflare API token set as an environment variable in Traefik service
 echo "Creating secure systemd service for Traefik with Cloudflare token..."
@@ -374,6 +397,28 @@ sudo systemctl daemon-reload
 sudo systemctl start traefik
 sudo systemctl enable traefik
 
+# Create promote_to_production.sh script in /home/<GHOST_USER>/bin/
+echo "Creating promote_to_production.sh script..."
+sudo mkdir -p /home/$GHOST_USER/bin
+sudo bash -c "cat << 'EOF' > /home/$GHOST_USER/bin/promote_to_production.sh
+#!/bin/bash
+# This script switches the certResolver from 'staging' to 'production'
+# in the Traefik dynamic.yml file and restarts Traefik to finalize.
+
+DYNAMIC_FILE=\"/etc/traefik/conf/dynamic.yml\"
+
+# Switch the certResolver to production
+sudo sed -i 's/certResolver: staging/certResolver: production/g' \$DYNAMIC_FILE
+
+# Restart Traefik to apply changes
+sudo systemctl restart traefik
+
+echo \"Traefik has been updated to use the production certificate.\"
+EOF"
+
+# Make the script executable
+sudo chmod +x /home/$GHOST_USER/bin/promote_to_production.sh
+
 # Clear bash history to ensure no sensitive data is logged
 echo "Clearing bash history..."
 history -c
@@ -381,7 +426,10 @@ history -w
 
 # Completion message
 echo "Setup completed."
-echo "You may need to run the following command to start Ghost:"
-echo "cd /var/www/ghost && ghost start"
+echo "You may need to run the following command to start Ghost if it's not already running:"
+echo "  cd /var/www/ghost && ghost start"
 echo "Verify the installation by running 'ghost status' and checking your site at https://$DOMAIN."
-echo "For production, run 'sudo /usr/local/bin/promote_to_production.sh' to switch to production certificates after confirming that everything works in staging mode."
+echo
+echo "After confirming that staging certificates work, run:"
+echo "  sudo /home/$GHOST_USER/bin/promote_to_production.sh"
+echo "to switch to production certificates."
